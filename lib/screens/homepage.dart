@@ -7,94 +7,100 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 50),
-              Card(
-                color: Colors.amber[400],
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                margin: const EdgeInsets.all(15),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      ListTile(
-                        title: Text(
-                          "Balance",
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        "Rp 10.000.000",
-                        style: const TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                  ),
-                ),
-              ),
-              Card(
-                color: Colors.amber[400],
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                margin: const EdgeInsets.all(15),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      ListTile(
-                        title: Text(
-                          'Records',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      // Bungkus dengan SizedBox untuk memberi batas tinggi scroll
-                      SizedBox(
-                        height: 200, // Sesuaikan tinggi agar bisa di-scroll
-                        child: SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              buildExpenseRow('Salary', 'Rp 5.000.000'),
-                              buildExpenseRow('Bonus', 'Rp 1.000.000'),
-                              buildExpenseRow('Investment', 'Rp 2.000.000'),
-                              buildExpenseRow('Freelance', 'Rp 1.500.000'),
-                              buildExpenseRow('Business', 'Rp 3.000.000'),
-                              buildExpenseRow('Other Income', 'Rp 500.000'),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                  ),
+      body: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 50),
+            buildCard('Balance', 'Rp 100.000.000', isBalance: true),
+            buildCard(
+              'Expense',
+              null,
+              items: [
+                buildExpenseRow('Food', 'Rp 500.000'),
+                buildExpenseRow('Transport', 'Rp 300.000'),
+                buildExpenseRow('Entertainment', 'Rp 200.000'),
+                buildExpenseRow('Bills', 'Rp 1.000.000'),
+              ],
+            ),
+            buildCard(
+              'Records',
+              null,
+              items: [
+                buildExpenseRow('Salary', 'Rp 5.000.000'),
+                buildExpenseRow('Bonus', 'Rp 1.000.000'),
+                buildExpenseRow('Investment', 'Rp 2.000.000'),
+              ],
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          openDialog();
+        },
+        tooltip: 'Increment',
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget buildCard(
+    String title,
+    String? balance, {
+    List<Widget>? items,
+    bool isBalance = false,
+  }) {
+    return Card(
+      color: Colors.amber[400],
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      margin: const EdgeInsets.all(15),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              title: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
-            ],
-          ),
+            ),
+            if (isBalance) // Untuk Card Balance
+              Text(
+                balance!,
+                style: const TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            if (items != null) Column(children: items),
+            const SizedBox(height: 10),
+          ],
         ),
       ),
     );
@@ -108,7 +114,7 @@ class _HomePageState extends State<HomePage> {
         children: [
           Text(
             category,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -116,7 +122,7 @@ class _HomePageState extends State<HomePage> {
           ),
           Text(
             amount,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -126,4 +132,19 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+  Future openDialog() => showDialog(
+    context: context,
+    builder:
+        (context) => AlertDialog(
+          title: const Text('Ini Dialog'),
+          content: const Text('Sipsipoke Amanaja'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+  );
 }
