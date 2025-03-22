@@ -7,20 +7,74 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+class _HomePageState extends State<HomePage> {
+  dynamic balance = 100000000;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this);
+  List<Map<String, dynamic>> expenses = [
+    {'category': 'Food', 'amount': 0},
+    {'category': 'Transport', 'amount': 0},
+    {'category': 'Entertainment', 'amount': 0},
+    {'category': 'Investment', 'amount': 0},
+  ];
+
+  List<Map<String, dynamic>> records = [];
+
+  String rupiahFormat(int amount) {
+    String number = amount.toString();
+    String result = '';
+    int count = 0;
+
+    for (int i = number.length - 1; i >= 0; i--) {
+      result = number[i] + result;
+      count++;
+      if (count % 3 == 0 && i != 0) {
+        result = '.$result';
+      }
+    }
+    return result;
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void addRecord(String category, int amount) {
+    setState(() {
+      records.add({'category': category, 'amount': amount});
+      balance -= amount;
+      for (var expense in expenses) {
+        if (expense['category'] == category) {
+          expense['amount'] += amount;
+          return;
+        }
+      }
+      expenses.add({'category': category, 'amount': amount});
+    });
+  }
+
+  void editRecord(int index, String category, int newAmount) {
+    setState(() {
+      balance += records[index]['amount'];
+      balance -= newAmount;
+      for (var expense in expenses) {
+        if (expense['category'] == records[index]['category']) {
+          expense['amount'] -= records[index]['amount'];
+        }
+        if (expense['category'] == category) {
+          expense['amount'] += newAmount;
+        }
+      }
+      records[index] = {'category': category, 'amount': newAmount};
+    });
+  }
+
+  void deleteRecord(int index) {
+    balance += records[index]['amount'];
+    for (var expense in expenses) {
+      if (expense['category'] == records[index]['category']) {
+        expense['amount'] -= records[index]['amount'];
+        break;
+      }
+    }
+    setState(() {
+      records.removeAt(index);
+    });
   }
 
   @override
@@ -31,25 +85,35 @@ class _HomePageState extends State<HomePage>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const SizedBox(height: 50),
-            buildCard('Balance', 'Rp 100.000.000', isBalance: true),
             buildCard(
-              'Expense',
+              'Balance',
+              'Rp ${rupiahFormat(balance)}',
+              isBalance: true,
+            ),
+            buildCard(
+              'Expenses',
               null,
-              items: [
-                buildExpenseRow('Food', 'Rp 500.000'),
-                buildExpenseRow('Transport', 'Rp 300.000'),
-                buildExpenseRow('Entertainment', 'Rp 200.000'),
-                buildExpenseRow('Bills', 'Rp 1.000.000'),
-              ],
+              items:
+                  expenses
+                      .map(
+                        (expense) => buildExpenseRow(
+                          expense['category'],
+                          'Rp ${rupiahFormat(expense['amount'])}',
+                        ),
+                      )
+                      .toList(),
             ),
             buildCard(
               'Records',
               null,
-              items: [
-                buildExpenseRow('Salary', 'Rp 5.000.000'),
-                buildExpenseRow('Bonus', 'Rp 1.000.000'),
-                buildExpenseRow('Investment', 'Rp 2.000.000'),
-              ],
+              items: List.generate(
+                records.length,
+                (index) => buildRecordRow(
+                  records[index]['category'],
+                  'Rp ${rupiahFormat(records[index]['amount'])}',
+                  index,
+                ),
+              ),
             ),
           ],
         ),
@@ -58,8 +122,107 @@ class _HomePageState extends State<HomePage>
         onPressed: () {
           openDialog();
         },
-        tooltip: 'Increment',
+        tooltip: 'Add Record',
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Future openDialog({int? index}) {
+    String selectedCategory =
+        index != null ? records[index]['category'] : expenses.first['category'];
+    TextEditingController amountController = TextEditingController(
+      text: index != null ? records[index]['amount'].toString() : '',
+    );
+
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(index == null ? 'Tambah Data' : 'Edit Data'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: selectedCategory,
+                items:
+                    expenses.map<DropdownMenuItem<String>>((expense) {
+                      return DropdownMenuItem<String>(
+                        value: expense['category'],
+                        child: Text(expense['category']),
+                      );
+                    }).toList(),
+                onChanged: (value) {
+                  selectedCategory = value!;
+                },
+              ),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Amount'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                int amount = int.tryParse(amountController.text) ?? 0;
+                if (amount > 0) {
+                  if (index == null) {
+                    addRecord(selectedCategory, amount);
+                  } else {
+                    editRecord(index, selectedCategory, amount);
+                  }
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget buildRecordRow(String category, String amount, int index) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            category,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          Row(
+            children: [
+              Text(
+                amount,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit, color: Colors.white),
+                onPressed: () => openDialog(index: index),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete, color: Colors.white),
+                onPressed: () => deleteRecord(index),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -89,7 +252,7 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
             ),
-            if (isBalance) // Untuk Card Balance
+            if (isBalance)
               Text(
                 balance!,
                 style: const TextStyle(
@@ -132,19 +295,4 @@ class _HomePageState extends State<HomePage>
       ),
     );
   }
-
-  Future openDialog() => showDialog(
-    context: context,
-    builder:
-        (context) => AlertDialog(
-          title: const Text('Ini Dialog'),
-          content: const Text('Sipsipoke Amanaja'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
-  );
 }
