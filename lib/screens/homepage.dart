@@ -1,4 +1,8 @@
+import 'package:expense_tracker/models/enums.dart';
+import 'package:expense_tracker/models/record.dart';
+import 'package:expense_tracker/services/database.service.dart';
 import 'package:flutter/material.dart';
+import 'package:isar/isar.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,6 +23,12 @@ class _HomePageState extends State<HomePage> {
 
   List<Map<String, dynamic>> records = [];
 
+  @override
+  void initState() {
+    super.initState();
+    loadRecordsFromDb();
+  }
+
   String rupiahFormat(int amount) {
     String number = amount.toString();
     String result = '';
@@ -34,47 +44,79 @@ class _HomePageState extends State<HomePage> {
     return result;
   }
 
-  void addRecord(String category, int amount) {
+  Future<void> loadRecordsFromDb() async {
+    final dbRecords = await DatabaseService.db.records.where().findAll();
+
     setState(() {
-      records.add({'category': category, 'amount': amount});
-      balance -= amount;
-      for (var expense in expenses) {
-        if (expense['category'] == category) {
-          expense['amount'] += amount;
-          return;
-        }
+      records =
+          dbRecords
+              .map(
+                (r) => {
+                  'category':
+                      r.category.name[0].toUpperCase() +
+                      r.category.name.substring(1),
+                  'amount': r.amount,
+                },
+              )
+              .toList();
+
+      // Hitung balance ulang
+      balance = 100000000;
+      for (var r in dbRecords) {
+        balance -= r.amount;
       }
-      expenses.add({'category': category, 'amount': amount});
+
+      for (var expense in expenses) {
+        expense['amount'] = dbRecords
+            .where((r) => r.category.name == expense['category'].toLowerCase())
+            .fold(0, (sum, r) => sum + r.amount);
+      }
     });
   }
 
-  void editRecord(int index, String category, int newAmount) {
-    setState(() {
-      balance += records[index]['amount'];
-      balance -= newAmount;
-      for (var expense in expenses) {
-        if (expense['category'] == records[index]['category']) {
-          expense['amount'] -= records[index]['amount'];
-        }
-        if (expense['category'] == category) {
-          expense['amount'] += newAmount;
-        }
-      }
-      records[index] = {'category': category, 'amount': newAmount};
+  void addRecord(String category, int amount) async {
+    final newRecord = Record(
+      amount: amount,
+      category: Category.values.firstWhere(
+        (c) => c.name.toLowerCase() == category.toLowerCase(),
+      ),
+    );
+
+    await DatabaseService.db.writeTxn(() async {
+      await DatabaseService.db.records.put(newRecord);
     });
+
+    await loadRecordsFromDb();
   }
 
-  void deleteRecord(int index) {
-    balance += records[index]['amount'];
-    for (var expense in expenses) {
-      if (expense['category'] == records[index]['category']) {
-        expense['amount'] -= records[index]['amount'];
-        break;
-      }
-    }
-    setState(() {
-      records.removeAt(index);
+  void editRecord(int index, String category, int newAmount) async {
+    final dbRecords = await DatabaseService.db.records.where().findAll();
+
+    if (index >= dbRecords.length) return;
+
+    final oldRecord = dbRecords[index];
+    oldRecord.amount = newAmount;
+    oldRecord.category = Category.values.firstWhere(
+      (c) => c.name == category.toLowerCase(),
+    );
+
+    await DatabaseService.db.writeTxn(() async {
+      await DatabaseService.db.records.put(oldRecord);
     });
+
+    await loadRecordsFromDb();
+  }
+
+  void deleteRecord(int index) async {
+    final dbRecords = await DatabaseService.db.records.where().findAll();
+
+    if (index >= dbRecords.length) return;
+
+    await DatabaseService.db.writeTxn(() async {
+      await DatabaseService.db.records.delete(dbRecords[index].id);
+    });
+
+    await loadRecordsFromDb();
   }
 
   @override
@@ -146,10 +188,12 @@ class _HomePageState extends State<HomePage> {
               DropdownButtonFormField<String>(
                 value: selectedCategory,
                 items:
-                    expenses.map<DropdownMenuItem<String>>((expense) {
+                    Category.values.map((cat) {
+                      String name =
+                          cat.name[0].toUpperCase() + cat.name.substring(1);
                       return DropdownMenuItem<String>(
-                        value: expense['category'],
-                        child: Text(expense['category']),
+                        value: name,
+                        child: Text(name),
                       );
                     }).toList(),
                 onChanged: (value) {
